@@ -259,13 +259,41 @@ export default function Register() {
               disabled={loading}
               onClick={async () => {
                 setLoading(true);
+                setError(null);
                 try {
                   const { signInWithGoogle } = await import('@/firebase/auth');
                   await signInWithGoogle();
                   router.push('/dashboard');
                 } catch (error: any) {
                   console.error('Error con Google:', error);
-                  setError('Error al registrarse con Google');
+                  
+                  // Manejar errores específicos de Google
+                  let errorMessage = 'Error al registrarse con Google';
+                  
+                  if (error.code) {
+                    switch (error.code) {
+                      case 'auth/popup-closed-by-user':
+                        // No mostrar error si el usuario simplemente cerró el popup
+                        console.log('Usuario canceló el login con Google');
+                        return; // Salir sin mostrar error
+                      case 'auth/popup-blocked':
+                        errorMessage = 'El popup fue bloqueado por tu navegador. Por favor, permite popups para este sitio.';
+                        break;
+                      case 'auth/cancelled-popup-request':
+                        errorMessage = 'Proceso de autenticación cancelado. Inténtalo de nuevo.';
+                        break;
+                      case 'auth/account-exists-with-different-credential':
+                        errorMessage = 'Ya existe una cuenta con este email usando un método diferente.';
+                        break;
+                      case 'auth/network-request-failed':
+                        errorMessage = 'Error de conexión. Verifica tu internet e inténtalo de nuevo.';
+                        break;
+                      default:
+                        errorMessage = `Error: ${error.message || errorMessage}`;
+                    }
+                  }
+                  
+                  setError(errorMessage);
                 } finally {
                   setLoading(false);
                 }
@@ -288,13 +316,38 @@ export default function Register() {
               disabled={loading}
               onClick={async () => {
                 setLoading(true);
+                setError(null);
                 try {
                   const { signInWithFacebook } = await import('@/firebase/auth');
                   await signInWithFacebook();
                   router.push('/dashboard');
                 } catch (error: any) {
                   console.error('Error con Facebook:', error);
-                  setError('Error al registrarse con Facebook');
+                  
+                  // Manejar errores específicos de Facebook
+                  let errorMessage = 'Error al registrarse con Facebook';
+                  
+                  if (error.code) {
+                    switch (error.code) {
+                      case 'auth/popup-closed-by-user':
+                        // No mostrar error si el usuario simplemente cerró el popup
+                        console.log('Usuario canceló el login con Facebook');
+                        return; // Salir sin mostrar error
+                      case 'auth/popup-blocked':
+                        errorMessage = 'El popup fue bloqueado por tu navegador. Por favor, permite popups para este sitio.';
+                        break;
+                      case 'auth/cancelled-popup-request':
+                        errorMessage = 'Proceso de autenticación cancelado. Inténtalo de nuevo.';
+                        break;
+                      case 'auth/account-exists-with-different-credential':
+                        errorMessage = 'Ya existe una cuenta con este email usando un método diferente.';
+                        break;
+                      default:
+                        errorMessage = `Error: ${error.message || errorMessage}`;
+                    }
+                  }
+                  
+                  setError(errorMessage);
                 } finally {
                   setLoading(false);
                 }

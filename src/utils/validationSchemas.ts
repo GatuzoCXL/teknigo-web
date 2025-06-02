@@ -1,18 +1,27 @@
 import * as yup from 'yup';
+import { validateEmail, validatePassword, validatePhone, validateName } from './validation';
 
 // Esquema de validación para el registro de usuarios
 export const registerSchema = yup.object().shape({
   displayName: yup.string()
     .required('El nombre es obligatorio')
-    .min(3, 'El nombre debe tener al menos 3 caracteres'),
+    .min(2, 'El nombre debe tener al menos 2 caracteres')
+    .max(50, 'El nombre no puede exceder 50 caracteres')
+    .test('valid-name', 'El nombre contiene caracteres no válidos', value => 
+      value ? validateName(value) : false
+    ),
   email: yup.string()
-    .email('Ingrese un email válido')
-    .required('El email es obligatorio'),
+    .required('El email es obligatorio')
+    .test('valid-email', 'Ingrese un email válido con un dominio permitido', value => 
+      value ? validateEmail(value) : false
+    ),
   password: yup.string()
     .required('La contraseña es obligatoria')
-    .min(8, 'La contraseña debe tener al menos 8 caracteres')
-    .matches(/[A-Z]/, 'La contraseña debe contener al menos una letra mayúscula')
-    .matches(/[0-9]/, 'La contraseña debe contener al menos un número'),
+    .test('password-strength', 'La contraseña no cumple los requisitos de seguridad', value => {
+      if (!value) return false;
+      const validation = validatePassword(value);
+      return validation.isValid;
+    }),
   confirmPassword: yup.string()
     .oneOf([yup.ref('password')], 'Las contraseñas no coinciden')
     .required('Debe confirmar su contraseña'),
@@ -23,42 +32,13 @@ export const registerSchema = yup.object().shape({
     .oneOf([true], 'Debe aceptar los términos y condiciones')
 });
 
-// Esquema para solicitudes de servicio
-export const serviceRequestSchema = yup.object().shape({
-  serviceType: yup.string()
-    .required('El tipo de servicio es obligatorio'),
-  description: yup.string()
-    .required('La descripción del problema es obligatoria')
-    .min(10, 'La descripción debe tener al menos 10 caracteres'),
-  location: yup.string(),
-  serviceArea: yup.string()
-    .required('El área de servicio es obligatoria'),
-  urgent: yup.boolean(),
-  preferredDate: yup.date().nullable(),
-  preferredTime: yup.string(),
-  budget: yup.number().nullable()
-    .transform((value, originalValue) => 
-      originalValue === '' ? null : value)
-    .positive('El presupuesto debe ser un valor positivo'),
-  additionalNotes: yup.string()
-});
-
-// Esquema para reseñas
-export const reviewSchema = yup.object().shape({
-  rating: yup.number()
-    .required('La calificación es obligatoria')
-    .min(1, 'La calificación mínima es 1')
-    .max(5, 'La calificación máxima es 5'),
-  comment: yup.string()
-    .required('El comentario es obligatorio')
-    .min(5, 'El comentario debe tener al menos 5 caracteres')
-});
-
 // Esquema para inicio de sesión
 export const loginSchema = yup.object().shape({
   email: yup.string()
-    .email('Ingrese un email válido')
-    .required('El email es obligatorio'),
+    .required('El email es obligatorio')
+    .test('valid-email', 'Ingrese un email válido', value => 
+      value ? validateEmail(value) : false
+    ),
   password: yup.string()
     .required('La contraseña es obligatoria')
 });
@@ -66,17 +46,31 @@ export const loginSchema = yup.object().shape({
 // Esquema para edición de perfil
 export const profileSchema = yup.object().shape({
   displayName: yup.string()
-    .required('El nombre es obligatorio'),
-  phone: yup.string(),
-  address: yup.string(),
-  city: yup.string(),
+    .required('El nombre es obligatorio')
+    .test('valid-name', 'El nombre contiene caracteres no válidos', value => 
+      value ? validateName(value) : false
+    ),
+  phone: yup.string()
+    .test('valid-phone', 'Formato de teléfono inválido', value => 
+      !value || validatePhone(value)
+    ),
+  address: yup.string()
+    .max(100, 'La dirección no puede exceder 100 caracteres'),
+  city: yup.string()
+    .max(50, 'La ciudad no puede exceder 50 caracteres'),
   newEmail: yup.string()
-    .email('Ingrese un email válido')
-    .required('El email es obligatorio'),
+    .required('El email es obligatorio')
+    .test('valid-email', 'Ingrese un email válido con un dominio permitido', value => 
+      value ? validateEmail(value) : false
+    ),
   currentPassword: yup.string(),
   newPassword: yup.string()
-    .test('password-length', 'La nueva contraseña debe tener al menos 8 caracteres', 
-      value => !value || value.length >= 8),
+    .test('password-length', 'La nueva contraseña no cumple los requisitos de seguridad', 
+      function(value) {
+        if (!value) return true; // Opcional
+        const validation = validatePassword(value);
+        return validation.isValid;
+      }),
   confirmPassword: yup.string()
     .test('passwords-match', 'Las contraseñas no coinciden', 
       function(value) {

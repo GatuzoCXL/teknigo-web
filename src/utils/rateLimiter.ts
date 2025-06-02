@@ -1,16 +1,19 @@
-import { collection, doc, getDoc, setDoc, updateDoc, serverTimestamp, increment } from 'firebase/firestore';
 import { firestore } from '@/firebase/config';
+import { doc, getDoc, setDoc, updateDoc, serverTimestamp, increment } from 'firebase/firestore';
 
-// Definimos tipos para las diferentes categorías de rate limiting
-type RateLimitCategory = 'login' | 'register' | 'serviceRequest' | 'api' | 'contactForm';
+export type RateLimitCategory = 'api' | 'auth' | 'serviceRequest' | 'contact';
 
-// Configuraciones para distintos tipos de rate limiting
-const rateLimitConfigs = {
-  login: { maxAttempts: 5, blockDuration: 15 }, // 5 intentos, 15 minutos de bloqueo
-  register: { maxAttempts: 3, blockDuration: 60 }, // 3 intentos, 60 minutos de bloqueo
-  serviceRequest: { maxAttempts: 10, blockDuration: 60 }, // 10 solicitudes, 60 minutos de bloqueo
-  api: { maxAttempts: 100, blockDuration: 5 }, // 100 solicitudes, 5 minutos de bloqueo
-  contactForm: { maxAttempts: 5, blockDuration: 60 } // 5 envíos, 60 minutos de bloqueo
+interface RateLimitConfig {
+  maxAttempts: number;
+  blockDuration: number; // en minutos
+  resetTime: number; // tiempo para resetear contador en minutos
+}
+
+const rateLimitConfigs: Record<RateLimitCategory, RateLimitConfig> = {
+  api: { maxAttempts: 100, blockDuration: 15, resetTime: 60 },
+  auth: { maxAttempts: 5, blockDuration: 30, resetTime: 60 },
+  serviceRequest: { maxAttempts: 10, blockDuration: 60, resetTime: 240 },
+  contact: { maxAttempts: 3, blockDuration: 30, resetTime: 60 }
 };
 
 /**
@@ -21,57 +24,114 @@ export async function checkRateLimit(
   category: RateLimitCategory = 'api'
 ): Promise<{ allowed: boolean; remainingAttempts: number; blockTimeRemaining: number }> {
   const config = rateLimitConfigs[category];
-  const rateLimitRef = doc(firestore, 'rateLimits', `${category}_${identifier}`);
-
+  const docId = `${category}_${identifier}`;
+  
   try {
+    const rateLimitRef = doc(firestore, 'rateLimits', docId);
     const rateLimitDoc = await getDoc(rateLimitRef);
+    
     const now = new Date();
     
-    // Si no hay registro previo, crear uno nuevo
-    if (!rateLimitDoc.exists()) {
+    if (rateLimitDoc.exists()) {
+      const data = rateLimitDoc.data();
+      const lastAttempt = data.lastAttempt?.toDate() || new Date(0);
+      const blockUntil = data.blockUntil?.toDate();
+      
+      // Verificar si está bloqueado
+      if (blockUntil && now < blockUntil) {
+        return {
+          allowed: false,
+          remainingAttempts: 0,
+          blockTimeRemaining: Math.ceil((blockUntil.getTime() - now.getTime()) / 1000)
+        };
+      }
+      
+      // Resetear contador si ha pasado el tiempo de reset
+      const resetTime = new Date(lastAttempt.getTime() + (config.resetTime * 60 * 1000));
+      if (now > resetTime) {
+        await setDoc(rateLimitRef, {
+          attempts: 1,
+          lastAttempt: serverTimestamp(),
+          blockUntil: null
+        });
+        
+        return {
+          allowed: true,
+          remainingAttempts: config.maxAttempts - 1,
+          blockTimeRemaining: 0
+        };
+      }
+      
+      // Incrementar contador
+      const newAttempts = (data.attempts || 0) + 1;
+      
+      if (newAttempts >= config.maxAttempts) {
+        // Bloquear usuario
+        const blockUntil = new Date(now.getTime() + (config.blockDuration * 60 * 1000));
+        
+        await updateDoc(rateLimitRef, {
+          attempts: increment(1),
+          lastAttempt: serverTimestamp(),
+          blockUntil: blockUntil
+        });
+        
+        return {
+          allowed: false,
+          remainingAttempts: 0,
+          blockTimeRemaining: config.blockDuration * 60
+        };
+      } else {
+        // Incrementar contador
+        await updateDoc(rateLimitRef, {
+          attempts: increment(1),
+          lastAttempt: serverTimestamp()
+        });
+        
+        return {
+          allowed: true,
+          remainingAttempts: config.maxAttempts - newAttempts,
+          blockTimeRemaining: 0
+        };
+      }
+    } else {
+      // Primera vez
       await setDoc(rateLimitRef, {
         attempts: 1,
-        firstAttempt: serverTimestamp(),
-        lastAttempt: serverTimestamp()
+        lastAttempt: serverTimestamp(),
+        blockUntil: null
       });
-      return { allowed: true, remainingAttempts: config.maxAttempts - 1, blockTimeRemaining: 0 };
+      
+      return {
+        allowed: true,
+        remainingAttempts: config.maxAttempts - 1,
+        blockTimeRemaining: 0
+      };
     }
-    
-    const data = rateLimitDoc.data();
-    const lastAttempt = data.lastAttempt.toDate();
-    const timeSinceLastAttempt = (now.getTime() - lastAttempt.getTime()) / 1000 / 60; // en minutos
-    
-    // Si ha pasado el tiempo de bloqueo, reiniciar contador
-    if (data.attempts >= config.maxAttempts && timeSinceLastAttempt >= config.blockDuration) {
-      await setDoc(rateLimitRef, {
-        attempts: 1,
-        firstAttempt: serverTimestamp(),
-        lastAttempt: serverTimestamp()
-      });
-      return { allowed: true, remainingAttempts: config.maxAttempts - 1, blockTimeRemaining: 0 };
-    }
-    
-    // Si está bloqueado
-    if (data.attempts >= config.maxAttempts) {
-      const blockTimeRemaining = Math.ceil(config.blockDuration - timeSinceLastAttempt);
-      return { allowed: false, remainingAttempts: 0, blockTimeRemaining };
-    }
-    
-    // Incrementar intentos
-    await updateDoc(rateLimitRef, {
-      attempts: increment(1),
-      lastAttempt: serverTimestamp()
-    });
-    
-    return { 
-      allowed: true, 
-      remainingAttempts: config.maxAttempts - (data.attempts + 1),
-      blockTimeRemaining: 0 
-    };
-    
   } catch (error) {
-    console.error('Rate limit check error:', error);
-    // En caso de error permitimos el acceso pero logueamos
-    return { allowed: true, remainingAttempts: 1, blockTimeRemaining: 0 };
+    console.error('Error in rate limiting:', error);
+    // En caso de error, permitir la acción
+    return {
+      allowed: true,
+      remainingAttempts: config.maxAttempts,
+      blockTimeRemaining: 0
+    };
+  }
+}
+
+/**
+ * Resetear límites para un identificador específico
+ */
+export async function resetRateLimit(identifier: string, category: RateLimitCategory = 'api'): Promise<void> {
+  const docId = `${category}_${identifier}`;
+  const rateLimitRef = doc(firestore, 'rateLimits', docId);
+  
+  try {
+    await setDoc(rateLimitRef, {
+      attempts: 0,
+      lastAttempt: serverTimestamp(),
+      blockUntil: null
+    });
+  } catch (error) {
+    console.error('Error resetting rate limit:', error);
   }
 }
