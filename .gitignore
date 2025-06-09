@@ -4,6 +4,8 @@
 node_modules/
 testing/node_modules/
 */node_modules/
+package-lock.json
+yarn.lock
 
 # Testing reports - excluir del repositorio
 testing/reports/
@@ -19,6 +21,21 @@ testing/debug_*.py
 testing/test_*.py
 testing/*cleanup*.bat
 
+# Stress testing - scripts automatizados y documentación interna
+stress-tests/run_complete_suite.ps1
+stress-tests/run_tests.ps1
+stress-tests/run_tests.sh
+stress-tests/endpoints-analysis.md
+stress-tests/GUIA_COMPLETA.md
+
+# Credenciales sensibles - Firebase y otros
+stress-tests/credentials/
+*firebase-adminsdk*.json
+*service-account*.json
+*.pem
+*.key
+*.cert
+
 # Python cache
 __pycache__/
 *.pyc
@@ -29,6 +46,9 @@ env/
 venv/
 .env
 .venv/
+*.egg-info/
+dist/
+build/
 
 # OS generated files
 .DS_Store
@@ -51,18 +71,31 @@ logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+lerna-debug.log*
+
+# WebDriver y Selenium temporales
+.wdm/
+chromedriver*
+geckodriver*
+msedgedriver*
+selenium-debug.log
 
 # Environment variables
+.env
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
+.env.*
+!.env.example
 
 # Next.js
 .next/
 out/
 build/
+.vercel/
 
 # Firebase
 .firebase/
 firebase-debug.log
+*firebase-adminsdk*.json
