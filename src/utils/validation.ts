@@ -1,44 +1,107 @@
-export const validateEmail = (email: string): boolean => {
-  // Validación básica de formato
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(email)) {
-    return false;
-  }
-  
-  // Validación de dominios válidos
-  const validDomains = ['.com', '.net', '.org', '.edu', '.gov', '.pe', '.co', '.mx', '.es', '.io', '.tech'];
-  const domain = email.substring(email.lastIndexOf('.'));
-  return validDomains.includes(domain);
+// Dominios permitidos para correos electrónicos
+const ALLOWED_EMAIL_DOMAINS = [
+  'gmail.com',
+  'hotmail.com',
+  'outlook.com',
+  'yahoo.com',
+  'icloud.com',
+  'protonmail.com',
+  'teknigo.com',
+  'teknigo.pe',
+  'teknigo.mx',
+  'teknigo.co',
+  'teknigo.es'
+];
+
+// Requisitos de contraseña
+const PASSWORD_REQUIREMENTS = {
+  minLength: 8,
+  requireUppercase: true,
+  requireLowercase: true,
+  requireNumbers: true,
+  requireSpecialChars: true
 };
 
-export const validatePassword = (password: string): { isValid: boolean; errors: string[] } => {
-  const errors: string[] = [];
-  
-  if (password.length < 8) {
-    errors.push('La contraseña debe tener al menos 8 caracteres');
+/**
+ * Valida un correo electrónico
+ * @param email Correo electrónico a validar
+ * @returns Objeto con el resultado de la validación
+ */
+export function validateEmail(email: string): { isValid: boolean; message?: string } {
+  // Validar formato básico
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    return {
+      isValid: false,
+      message: 'El formato del correo electrónico no es válido'
+    };
   }
-  
-  if (!/[A-Z]/.test(password)) {
+
+  // Extraer el dominio
+  const domain = email.split('@')[1].toLowerCase();
+
+  // Verificar si el dominio está permitido
+  if (!ALLOWED_EMAIL_DOMAINS.includes(domain)) {
+    return {
+      isValid: false,
+      message: `El dominio ${domain} no está permitido. Por favor use uno de los siguientes dominios: ${ALLOWED_EMAIL_DOMAINS.join(', ')}`
+    };
+  }
+
+  return { isValid: true };
+}
+
+/**
+ * Valida una contraseña según los requisitos establecidos
+ * @param password Contraseña a validar
+ * @returns Objeto con el resultado de la validación
+ */
+export function validatePassword(password: string): { isValid: boolean; message?: string } {
+  const errors: string[] = [];
+
+  if (password.length < PASSWORD_REQUIREMENTS.minLength) {
+    errors.push(`La contraseña debe tener al menos ${PASSWORD_REQUIREMENTS.minLength} caracteres`);
+  }
+
+  if (PASSWORD_REQUIREMENTS.requireUppercase && !/[A-Z]/.test(password)) {
     errors.push('La contraseña debe contener al menos una letra mayúscula');
   }
-  
-  if (!/[a-z]/.test(password)) {
+
+  if (PASSWORD_REQUIREMENTS.requireLowercase && !/[a-z]/.test(password)) {
     errors.push('La contraseña debe contener al menos una letra minúscula');
   }
-  
-  if (!/[0-9]/.test(password)) {
+
+  if (PASSWORD_REQUIREMENTS.requireNumbers && !/\d/.test(password)) {
     errors.push('La contraseña debe contener al menos un número');
   }
-  
-  if (!/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
-    errors.push('La contraseña debe contener al menos un carácter especial');
+
+  if (PASSWORD_REQUIREMENTS.requireSpecialChars && !/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
+    errors.push('La contraseña debe contener al menos un carácter especial (!@#$%^&*(),.?":{}|<>)');
   }
-  
-  return {
-    isValid: errors.length === 0,
-    errors
-  };
-};
+
+  if (errors.length > 0) {
+    return {
+      isValid: false,
+      message: errors.join('. ')
+    };
+  }
+
+  return { isValid: true };
+}
+
+/**
+ * Obtiene los requisitos de contraseña para mostrar al usuario
+ */
+export function getPasswordRequirements(): string[] {
+  const requirements: string[] = [
+    `Mínimo ${PASSWORD_REQUIREMENTS.minLength} caracteres`,
+    'Al menos una letra mayúscula',
+    'Al menos una letra minúscula',
+    'Al menos un número',
+    'Al menos un carácter especial (!@#$%^&*(),.?":{}|<>)'
+  ];
+  return requirements;
+}
 
 export const validatePhone = (phone: string): boolean => {
   // Formato mexicano: +52 123 456 7890 o variaciones

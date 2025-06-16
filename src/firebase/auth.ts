@@ -12,6 +12,7 @@ import {
 import { auth, firestore } from './config';
 import { doc, setDoc, getDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { recordFailedLoginAttempt } from './loginSecurity';
+import { validateEmail, validatePassword } from '@/utils/validation';
 
 // Clase personalizada para errores de seguridad
 export class LoginSecurityError extends Error {
@@ -29,11 +30,19 @@ export class LoginSecurityError extends Error {
 }
 
 // Tipos para parámetros
-export type UserType = 'client' | 'technician' | 'admin';
+export type PublicUserType = 'client' | 'technician';
+export type AdminUserType = 'admin';
+export type UserType = PublicUserType | AdminUserType;
 
 // Login con Email y Contraseña
 export const loginWithEmailAndPassword = async (email: string, password: string) => {
   try {
+    // Validar email
+    const emailValidation = validateEmail(email);
+    if (!emailValidation.isValid) {
+      throw new Error(emailValidation.message);
+    }
+
     // Verificar si hay bloqueo por intentos fallidos
     const securityCheck = await recordFailedLoginAttempt(email);
     if (securityCheck.isBlocked) {
@@ -58,9 +67,21 @@ export const registerWithEmailAndPassword = async (
   email: string, 
   password: string, 
   displayName: string, 
-  userType: UserType
+  userType: PublicUserType
 ) => {
   try {
+    // Validar email
+    const emailValidation = validateEmail(email);
+    if (!emailValidation.isValid) {
+      throw new Error(emailValidation.message);
+    }
+
+    // Validar contraseña
+    const passwordValidation = validatePassword(password);
+    if (!passwordValidation.isValid) {
+      throw new Error(passwordValidation.message);
+    }
+
     // Crear usuario en Firebase Auth
     const result = await createUserWithEmailAndPassword(auth, email, password);
     const user = result.user;

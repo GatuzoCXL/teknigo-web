@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { collection, addDoc, doc, getDoc } from 'firebase/firestore';
+import { collection, addDoc, doc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { firestore, auth } from '@/firebase/config';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import Link from 'next/link';
@@ -10,6 +10,21 @@ import { serviceRequestSchema } from '@/utils/validationSchemas';
 import { yupResolver } from '@hookform/resolvers/yup';
 import { useForm } from 'react-hook-form';
 import { checkRateLimit } from '@/utils/rateLimiter';
+
+type ServiceFormData = {
+  title: string;
+  description: string;
+  address: string;
+  city: string;
+  serviceType: string;
+  priority: string;
+  serviceArea?: string;
+  urgent?: boolean;
+  preferredDate: Date;
+  preferredTime: string;
+  budget?: string;
+  additionalNotes?: string;
+};
 
 export default function RequestService() {
   const router = useRouter();
@@ -19,19 +34,7 @@ export default function RequestService() {
   const [success, setSuccess] = useState(false);
   const [userData, setUserData] = useState<any>(null);
   const [serviceTypes, setServiceTypes] = useState<string[]>([]);
-  const [userId, setUserId] = useState<string | null>(null); // Añadimos estado para el ID de usuario
-  
-  const [serviceRequest, setServiceRequest] = useState({
-    serviceType: '',
-    description: '',
-    location: '',
-    serviceArea: '',
-    urgent: false,
-    preferredDate: '',
-    preferredTime: '',
-    budget: '',
-    additionalNotes: ''
-  });
+  const [userId, setUserId] = useState<string | null>(null);
   
   // Lista de áreas de servicio
   const serviceAreaOptions = [
@@ -97,39 +100,26 @@ export default function RequestService() {
     return () => unsubscribe();
   }, []);
   
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    const { name, value, type } = e.target as HTMLInputElement;
-    
-    if (type === 'checkbox') {
-      setServiceRequest({
-        ...serviceRequest,
-        [name]: (e.target as HTMLInputElement).checked
-      });
-    } else {
-      setServiceRequest({
-        ...serviceRequest,
-        [name]: value
-      });
-    }
-  };
-  
   // Incorporar react-hook-form con validaciones yup
   const { register, handleSubmit, formState: { errors } } = useForm({
     resolver: yupResolver(serviceRequestSchema),
     defaultValues: {
-      serviceType: '',
+      title: '',
       description: '',
-      location: '',
+      address: '',
+      city: '',
+      serviceType: '',
+      priority: '',
       serviceArea: '',
       urgent: false,
-      preferredDate: '',
+      preferredDate: new Date(),
       preferredTime: '',
       budget: '',
       additionalNotes: ''
     }
   });
   
-  const onSubmit = async (data) => {
+  const onSubmit = async (data: ServiceFormData) => {
     setSubmitting(true);
     setError(null);
     
@@ -147,21 +137,18 @@ export default function RequestService() {
         return;
       }
       
-      // Crear la solicitud de servicio (utiliza datos validados)
+      // Preparar datos del servicio
+      const { budget, ...restData } = data;
       const serviceData = {
+        ...restData,
+        budget: budget ? parseFloat(budget) : undefined,
         clientId: user.uid,
         clientName: userData?.displayName || 'Cliente',
         clientEmail: user.email,
-        ...data, // Los datos ya están validados por yup
         status: 'pending',
-        createdAt: new Date(),
-        updatedAt: new Date()
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
       };
-      
-      // Convertir presupuesto a número si existe
-      if (serviceData.budget) {
-        serviceData.budget = parseFloat(serviceData.budget);
-      }
       
       // Guardar en Firestore
       const docRef = await addDoc(collection(firestore, 'services'), serviceData);
@@ -286,10 +273,7 @@ export default function RequestService() {
                     <div className="mt-1">
                       <textarea
                         id="description"
-                        name="description"
                         rows={4}
-                        value={serviceRequest.description}
-                        onChange={handleChange}
                         className="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md"
                         placeholder="Describa detalladamente el problema o servicio que necesita..."
                         {...register('description')}
@@ -305,141 +289,113 @@ export default function RequestService() {
                   
                   {/* Ubicación */}
                   <div>
-                    <label htmlFor="location" className="block text-sm font-medium text-gray-700">
-                      Dirección específica (opcional)
+                    <label htmlFor="address" className="block text-sm font-medium text-gray-700">
+                      Dirección <span className="text-red-500">*</span>
                     </label>
-                    <div className="mt-1">
-                      <input
-                        type="text"
-                        name="location"
-                        id="location"
-                        value={serviceRequest.location}
-                        onChange={handleChange}
-                        className="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md"
-                        placeholder="Ej. Calle Principal #123, Colonia Centro"
-                        {...register('location')}
-                      />
-                    </div>
-                    <p className="mt-2 text-sm text-gray-500">
-                      Esta información solo será visible para el técnico asignado.
-                    </p>
+                    <input
+                      type="text"
+                      id="address"
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                      placeholder="Ingrese la dirección del servicio"
+                      {...register('address')}
+                    />
+                    {errors.address && (
+                      <p className="mt-1 text-sm text-red-600">{errors.address.message}</p>
+                    )}
+                  </div>
+
+                  {/* Ciudad */}
+                  <div>
+                    <label htmlFor="city" className="block text-sm font-medium text-gray-700">
+                      Ciudad <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      id="city"
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                      placeholder="Ingrese la ciudad"
+                      {...register('city')}
+                    />
+                    {errors.city && (
+                      <p className="mt-1 text-sm text-red-600">{errors.city.message}</p>
+                    )}
                   </div>
                   
                   {/* Área de servicio */}
                   <div>
                     <label htmlFor="serviceArea" className="block text-sm font-medium text-gray-700">
-                      Área/Zona <span className="text-red-500">*</span>
+                      Área de servicio (opcional)
                     </label>
-                    <select
+                    <input
+                      type="text"
                       id="serviceArea"
-                      name="serviceArea"
-                      value={serviceRequest.serviceArea}
-                      onChange={handleChange}
-                      className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
-                      required={!serviceRequest.location}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                      placeholder="Ej. Zona Norte, Colonia Centro, etc."
                       {...register('serviceArea')}
-                    >
-                      <option value="">Seleccione una zona</option>
-                      {serviceAreaOptions.map((area) => (
-                        <option key={area} value={area}>{area}</option>
-                      ))}
-                    </select>
-                    {errors.serviceArea && (
-                      <p className="mt-1 text-sm text-red-600">{errors.serviceArea.message}</p>
+                    />
+                  </div>
+                  
+                  {/* Urgencia */}
+                  <div>
+                    <label htmlFor="urgent" className="block text-sm font-medium text-gray-700">
+                      Servicio urgente
+                    </label>
+                    <input
+                      type="checkbox"
+                      id="urgent"
+                      className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                      {...register('urgent')}
+                    />
+                  </div>
+                  
+                  {/* Fecha preferida */}
+                  <div>
+                    <label htmlFor="preferredDate" className="block text-sm font-medium text-gray-700">
+                      Fecha preferida <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="date"
+                      id="preferredDate"
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                      {...register('preferredDate')}
+                    />
+                    {errors.preferredDate && (
+                      <p className="mt-1 text-sm text-red-600">{errors.preferredDate.message}</p>
                     )}
                   </div>
                   
-                  {/* Urgente */}
-                  <div className="flex items-start">
-                    <div className="flex items-center h-5">
-                      <input
-                        id="urgent"
-                        name="urgent"
-                        type="checkbox"
-                        checked={serviceRequest.urgent}
-                        onChange={handleChange}
-                        className="focus:ring-blue-500 h-4 w-4 text-blue-600 border-gray-300 rounded"
-                        {...register('urgent')}
-                      />
-                    </div>
-                    <div className="ml-3 text-sm">
-                      <label htmlFor="urgent" className="font-medium text-gray-700">
-                        Servicio Urgente
-                      </label>
-                      <p className="text-gray-500">
-                        Marque esta opción si necesita atención inmediata o en las próximas 24 horas.
-                      </p>
-                    </div>
+                  {/* Horario preferido */}
+                  <div>
+                    <label htmlFor="preferredTime" className="block text-sm font-medium text-gray-700">
+                      Horario preferido <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      id="preferredTime"
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                      {...register('preferredTime')}
+                    >
+                      <option value="">Seleccione un horario</option>
+                      <option value="mañana">Mañana (8:00 - 12:00)</option>
+                      <option value="tarde">Tarde (12:00 - 16:00)</option>
+                      <option value="noche">Noche (16:00 - 20:00)</option>
+                    </select>
+                    {errors.preferredTime && (
+                      <p className="mt-1 text-sm text-red-600">{errors.preferredTime.message}</p>
+                    )}
                   </div>
                   
-                  {/* Fecha y hora preferida */}
-                  <div className="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-6">
-                    <div className="sm:col-span-3">
-                      <label htmlFor="preferredDate" className="block text-sm font-medium text-gray-700">
-                        Fecha preferida (opcional)
-                      </label>
-                      <div className="mt-1">
-                        <input
-                          type="date"
-                          name="preferredDate"
-                          id="preferredDate"
-                          min={new Date().toISOString().split('T')[0]}
-                          value={serviceRequest.preferredDate}
-                          onChange={handleChange}
-                          className="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md"
-                          {...register('preferredDate')}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="sm:col-span-3">
-                      <label htmlFor="preferredTime" className="block text-sm font-medium text-gray-700">
-                        Horario preferido (opcional)
-                      </label>
-                      <div className="mt-1">
-                        <select
-                          id="preferredTime"
-                          name="preferredTime"
-                          value={serviceRequest.preferredTime}
-                          onChange={handleChange}
-                          className="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md"
-                          {...register('preferredTime')}
-                        >
-                          <option value="">Seleccione un horario</option>
-                          <option value="morning">Mañana (8am - 12pm)</option>
-                          <option value="afternoon">Tarde (12pm - 6pm)</option>
-                          <option value="evening">Noche (6pm - 10pm)</option>
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  {/* Presupuesto estimado */}
+                  {/* Presupuesto */}
                   <div>
                     <label htmlFor="budget" className="block text-sm font-medium text-gray-700">
-                      Presupuesto estimado (PEN) (opcional)
+                      Presupuesto estimado (opcional)
                     </label>
-                    <div className="mt-1 relative rounded-md shadow-sm">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <span className="text-gray-500 sm:text-sm">$</span>
-                      </div>
-                      <input
-                        type="text"
-                        name="budget"
-                        id="budget"
-                        value={serviceRequest.budget}
-                        onChange={handleChange}
-                        className="focus:ring-blue-500 focus:border-blue-500 block w-full pl-7 pr-12 sm:text-sm border-gray-300 rounded-md"
-                        placeholder="0.00"
-                        aria-describedby="budget-currency"
-                        {...register('budget')}
-                      />
-                      <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                        <span className="text-gray-500 sm:text-sm" id="budget-currency">
-                          PEN
-                        </span>
-                      </div>
-                    </div>
+                    <input
+                      type="text"
+                      id="budget"
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                      placeholder="Ej. 1000"
+                      {...register('budget')}
+                    />
                     {errors.budget && (
                       <p className="mt-1 text-sm text-red-600">{errors.budget.message}</p>
                     )}
@@ -450,18 +406,13 @@ export default function RequestService() {
                     <label htmlFor="additionalNotes" className="block text-sm font-medium text-gray-700">
                       Notas adicionales (opcional)
                     </label>
-                    <div className="mt-1">
-                      <textarea
-                        id="additionalNotes"
-                        name="additionalNotes"
-                        rows={3}
-                        value={serviceRequest.additionalNotes}
-                        onChange={handleChange}
-                        className="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md"
-                        placeholder="Información adicional que pueda ser útil para el técnico..."
-                        {...register('additionalNotes')}
-                      />
-                    </div>
+                    <textarea
+                      id="additionalNotes"
+                      rows={3}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                      placeholder="Información adicional que considere relevante..."
+                      {...register('additionalNotes')}
+                    />
                   </div>
                   
                   {/* Acciones */}

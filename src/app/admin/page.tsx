@@ -13,6 +13,22 @@ interface StatCard {
   color: string;
 }
 
+// Tipo para usuarios de Firestore
+type FirestoreUser = {
+  id: string;
+  userType: string;
+  createdAt?: { toDate: () => number };
+  // Puedes agregar más campos relevantes aquí
+};
+
+// Tipo para servicios de Firestore
+type FirestoreService = {
+  id: string;
+  status: string;
+  createdAt?: { toDate: () => number };
+  // Puedes agregar más campos relevantes aquí
+};
+
 export default function AdminDashboard() {
   const [stats, setStats] = useState({
     totalUsers: 0,
@@ -31,13 +47,13 @@ export default function AdminDashboard() {
       try {
         // Fetch user statistics
         const usersSnapshot = await getDocs(collection(firestore, 'users'));
-        const users = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const users: FirestoreUser[] = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FirestoreUser));
         
         const technicians = users.filter(user => user.userType === 'technician');
         
         // Fetch service statistics
         const servicesSnapshot = await getDocs(collection(firestore, 'services'));
-        const services = servicesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const services: FirestoreService[] = servicesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FirestoreService));
         
         const pendingServices = services.filter(service => 
           service.status === 'pending' || service.status === 'accepted');

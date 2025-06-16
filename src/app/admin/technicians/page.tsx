@@ -6,9 +6,25 @@ import { collection, query, where, getDocs, doc, updateDoc } from 'firebase/fire
 import AdminLayout from '@/components/admin/AdminLayout';
 import Link from 'next/link';
 
+// Tipo para técnicos de Firestore
+type FirestoreTechnician = {
+  id: string;
+  userType: 'technician';
+  displayName?: string;
+  email?: string;
+  specialties?: string[];
+  isActive?: boolean;
+  isVerified?: boolean;
+  photoURL?: string;
+  rating?: number;
+  reviewCount?: number;
+  createdAt?: { toDate: () => Date };
+  // Puedes agregar más campos relevantes aquí
+};
+
 export default function AdminTechnicians() {
-  const [technicians, setTechnicians] = useState<any[]>([]);
-  const [filteredTechnicians, setFilteredTechnicians] = useState<any[]>([]);
+  const [technicians, setTechnicians] = useState<FirestoreTechnician[]>([]);
+  const [filteredTechnicians, setFilteredTechnicians] = useState<FirestoreTechnician[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -25,14 +41,16 @@ export default function AdminTechnicians() {
           where('userType', '==', 'technician')
         );
         const snapshot = await getDocs(q);
-        const techData = snapshot.docs.map(doc => ({
+        const techData: FirestoreTechnician[] = snapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data()
-        }));
+        } as FirestoreTechnician));
         
         // Ordenar por fecha de creación (más recientes primero)
-        techData.sort((a: any, b: any) => {
-          return b.createdAt?.toDate() - a.createdAt?.toDate() || 0;
+        techData.sort((a, b) => {
+          const dateA = a.createdAt?.toDate()?.getTime() || 0;
+          const dateB = b.createdAt?.toDate()?.getTime() || 0;
+          return dateB - dateA;
         });
         
         setTechnicians(techData);
@@ -72,7 +90,7 @@ export default function AdminTechnicians() {
     // Filtrar por estado
     if (statusFilter !== 'all') {
       const isActive = statusFilter === 'active';
-      result = result.filter(tech => tech.isActive === isActive);
+      result = result.filter(tech => (tech.isActive ?? false) === isActive);
     }
     
     // Filtrar por especialidad
@@ -85,16 +103,17 @@ export default function AdminTechnicians() {
     setFilteredTechnicians(result);
   }, [searchTerm, statusFilter, specialtyFilter, technicians]);
 
-  const toggleTechnicianStatus = async (techId: string, currentStatus: boolean) => {
+  const toggleTechnicianStatus = async (techId: string, currentStatus: boolean | undefined) => {
     try {
+      const newStatus = !(currentStatus ?? false);
       await updateDoc(doc(firestore, 'users', techId), {
-        isActive: !currentStatus,
+        isActive: newStatus,
         updatedAt: new Date()
       });
       
       // Actualizar el estado local
       setTechnicians(technicians.map(tech => 
-        tech.id === techId ? { ...tech, isActive: !currentStatus } : tech
+        tech.id === techId ? { ...tech, isActive: newStatus } : tech
       ));
       
       // Esto activará el useEffect para actualizar filteredTechnicians

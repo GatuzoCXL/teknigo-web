@@ -1,6 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  images: {
+    domains: ['lh3.googleusercontent.com'],
+  },
   async headers() {
     return [
       {
@@ -34,7 +37,7 @@ const nextConfig = {
           // CSP actualizada con todos los dominios necesarios para autenticación Google
           {
             key: 'Content-Security-Policy',
-            value: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.googleapis.com https://apis.google.com https://*.gstatic.com https://*.firebaseio.com https://*.firebaseapp.com https://www.googletagmanager.com https://accounts.google.com; connect-src 'self' https://*.googleapis.com https://apis.google.com https://*.firebaseio.com https://*.firebaseapp.com https://securetoken.googleapis.com https://identitytoolkit.googleapis.com https://accounts.google.com; img-src 'self' data: blob: https://*.googleapis.com https://*.gstatic.com https://*.google.com https://*.googleusercontent.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com; font-src 'self' data: https://fonts.gstatic.com; frame-src https://accounts.google.com https://*.firebaseapp.com https://accounts.google.com; form-action 'self' https://accounts.google.com; base-uri 'self'; object-src 'none';"
+            value: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.googleapis.com https://apis.google.com https://*.gstatic.com https://*.firebaseio.com https://*.firebaseapp.com https://www.googletagmanager.com https://accounts.google.com; connect-src 'self' https://*.googleapis.com https://apis.google.com https://*.firebaseio.com https://*.firebaseapp.com https://securetoken.googleapis.com https://identitytoolkit.googleapis.com https://accounts.google.com; img-src 'self' data: blob: https://*.googleapis.com https://*.gstatic.com https://*.google.com https://*.googleusercontent.com https://media1.tenor.com https://cdn.discordapp.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com; font-src 'self' data: https://fonts.gstatic.com; frame-src https://accounts.google.com https://*.firebaseapp.com https://accounts.google.com; form-action 'self' https://accounts.google.com; base-uri 'self'; object-src 'none';"
           }
         ]
       },

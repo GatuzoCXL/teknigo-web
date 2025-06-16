@@ -36,7 +36,8 @@ export default function TechnicianProfile() {
       weekends: false
     },
     certificates: [] as string[],
-    skills: [] as string[]
+    skills: [] as string[],
+    photoURL: ''
   });
   
   // Opciones para especialidades
@@ -95,7 +96,8 @@ export default function TechnicianProfile() {
             weekends: false
           },
           certificates: userData.certificates || [],
-          skills: userData.skills || []
+          skills: userData.skills || [],
+          photoURL: userData.photoURL || ''
         });
         
         // Establecer la vista previa de la imagen

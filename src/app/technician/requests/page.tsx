@@ -6,8 +6,20 @@ import { firestore, auth } from '@/firebase/config';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import Link from 'next/link';
 
+interface ServiceRequest {
+  id: string;
+  status: string;
+  technicianId?: string;
+  technicianName?: string;
+  technicianEmail?: string;
+  createdAt: {
+    toDate: () => Date;
+  };
+  [key: string]: any;
+}
+
 export default function ServiceRequests() {
-  const [requests, setRequests] = useState<any[]>([]);
+  const [requests, setRequests] = useState<ServiceRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState('all');
@@ -31,7 +43,10 @@ export default function ServiceRequests() {
       try {
         // Modificado para evitar el error
         // Primero, obtener todas las solicitudes con status pending
-        let requestsQuery;
+        let requestsQuery = query(
+          collection(firestore, 'services'),
+          where('status', '==', 'pending')
+        );
         
         // Si hay un problema con los índices, podemos separar las consultas
         if (filter === 'all' || filter === 'pending') {
@@ -61,12 +76,14 @@ export default function ServiceRequests() {
         const requestsData = snapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data()
-        }));
+        })) as ServiceRequest[];
         
         // Ordenar manualmente por fecha de creación (más recientes primero)
         requestsData.sort((a, b) => {
           if (!a.createdAt || !b.createdAt) return 0;
-          return b.createdAt.toDate() - a.createdAt.toDate();
+          const dateA = a.createdAt.toDate().getTime();
+          const dateB = b.createdAt.toDate().getTime();
+          return dateB - dateA;
         });
         
         setRequests(requestsData);

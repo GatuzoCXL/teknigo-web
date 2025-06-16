@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { collection, addDoc, doc, getDoc } from 'firebase/firestore';
+import { collection, addDoc, doc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { firestore, auth } from '@/firebase/config';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import Link from 'next/link';
@@ -38,12 +38,15 @@ export default function RequestServiceWithTechnician() {
   const { register, handleSubmit, formState: { errors } } = useForm({
     resolver: yupResolver(serviceRequestSchema),
     defaultValues: {
-      serviceType: '',
+      title: '',
       description: '',
-      location: '',
+      address: '',
+      city: '',
+      serviceType: '',
+      priority: '',
       serviceArea: '',
       urgent: false,
-      preferredDate: '',
+      preferredDate: new Date(),
       preferredTime: '',
       budget: '',
       additionalNotes: ''
@@ -118,44 +121,53 @@ export default function RequestServiceWithTechnician() {
     fetchData();
   }, [technicianId, router]);
   
-  const onSubmit = async (data) => {
+  type ServiceFormData = {
+    title: string;
+    description: string;
+    address: string;
+    city: string;
+    serviceType: string;
+    priority: string;
+    serviceArea?: string;
+    urgent?: boolean;
+    preferredDate: Date;
+    preferredTime: string;
+    budget?: string;
+    additionalNotes?: string;
+  };
+
+  type ServiceData = Omit<ServiceFormData, 'budget'> & {
+    budget?: number;
+    clientId?: string;
+    technicianId: string;
+    status: string;
+    createdAt: any;
+    updatedAt: any;
+  };
+
+  const onSubmit = async (data: ServiceFormData) => {
     setSubmitting(true);
     setError(null);
     
     try {
-      const user = auth.currentUser;
-      if (!user) {
-        throw new Error('No hay un usuario autenticado');
-      }
-      
-      // Verificar rate limit usando el ID del usuario
-      const rateLimitCheck = await checkRateLimit(user.uid, 'serviceRequest');
-      
-      if (!rateLimitCheck.allowed) {
-        setError(`Has excedido el límite de solicitudes. Por favor, intenta de nuevo en ${rateLimitCheck.blockTimeRemaining} minutos.`);
+      // Verificar límite de solicitudes
+      const canProceed = await checkRateLimit(user?.uid || '');
+      if (!canProceed) {
+        setError('Has alcanzado el límite de solicitudes. Por favor, espera un momento.');
         return;
       }
       
-      // Crear la solicitud de servicio con el técnico pre-asignado
-      const serviceData = {
-        clientId: user.uid,
-        clientName: userData?.displayName || 'Cliente',
-        clientEmail: user.email,
-        ...data, // Los datos ya están validados por yup
-        // Pre-asignar el técnico
-        technicianId: technicianId,
-        technicianName: technicianData?.displayName || 'Técnico',
-        technicianEmail: technicianData?.email || '',
-        // Estado "accepted" en lugar de "pending" ya que el técnico está pre-seleccionado
-        status: 'accepted',
-        createdAt: new Date(),
-        updatedAt: new Date()
+      // Preparar datos del servicio
+      const { budget, ...restData } = data;
+      const serviceData: ServiceData = {
+        ...restData,
+        budget: budget ? parseFloat(budget) : undefined,
+        clientId: user?.uid,
+        technicianId,
+        status: 'pending',
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
       };
-      
-      // Convertir presupuesto a número si existe
-      if (serviceData.budget) {
-        serviceData.budget = parseFloat(serviceData.budget);
-      }
       
       // Guardar en Firestore
       const docRef = await addDoc(collection(firestore, 'services'), serviceData);
@@ -350,18 +362,19 @@ export default function RequestServiceWithTechnician() {
                   
                   {/* Ubicación */}
                   <div>
-                    <label htmlFor="location" className="block text-sm font-medium text-gray-700">
-                      Dirección específica (opcional)
+                    <label htmlFor="address" className="block text-sm font-medium text-gray-700">
+                      Dirección
                     </label>
-                    <div className="mt-1">
-                      <input
-                        type="text"
-                        id="location"
-                        {...register('location')}
-                        className="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md"
-                        placeholder="Ej. Calle Principal #123, Colonia Centro"
-                      />
-                    </div>
+                    <input
+                      type="text"
+                      id="address"
+                      {...register('address')}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                      placeholder="Ingrese la dirección del servicio"
+                    />
+                    {errors.address && (
+                      <p className="mt-1 text-sm text-red-600">{errors.address.message}</p>
+                    )}
                   </div>
                   
                   {/* Área de servicio */}

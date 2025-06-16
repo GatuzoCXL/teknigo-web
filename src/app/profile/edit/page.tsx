@@ -10,9 +10,22 @@ import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import Link from 'next/link';
 import Image from 'next/image';
 
+// Tipo para los datos del perfil de usuario
+type UserProfileData = {
+  email: string | null;
+  uid: string;
+  photoURL: string | null;
+  displayName?: string;
+  phone?: string;
+  address?: string;
+  city?: string;
+  userType?: string;
+  // Puedes agregar más campos según sea necesario
+};
+
 export default function EditProfile() {
   const router = useRouter();
-  const [userData, setUserData] = useState<any>(null);
+  const [userData, setUserData] = useState<UserProfileData | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -42,7 +55,7 @@ export default function EditProfile() {
       try {
         const userDoc = await getDoc(doc(firestore, 'users', user.uid));
         if (userDoc.exists()) {
-          const userData = {
+          const userData: UserProfileData = {
             ...userDoc.data(),
             email: user.email,
             uid: user.uid,
@@ -155,8 +168,9 @@ export default function EditProfile() {
         setUserData({
           ...updatedUserDoc.data(),
           email: formData.newEmail || user.email,
-          uid: user.uid
-        });
+          uid: user.uid,
+          photoURL: user.photoURL
+        } as UserProfileData);
       }
       
       // Clear sensitive fields

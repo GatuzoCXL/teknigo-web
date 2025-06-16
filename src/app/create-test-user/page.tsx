@@ -2,13 +2,13 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { UserType } from '@/firebase/auth';
+import { PublicUserType } from '@/firebase/auth';
 
 export default function CreateTestUser() {
   const [email, setEmail] = useState('test@example.com');
   const [password, setPassword] = useState('password123');
   const [name, setName] = useState('Usuario de Prueba');
-  const [userType, setUserType] = useState<UserType>('client');
+  const [userType, setUserType] = useState<PublicUserType>('client');
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [user, setUser] = useState<any>(null);
@@ -72,12 +72,11 @@ export default function CreateTestUser() {
           <label className="block text-sm mb-1">Tipo de Usuario:</label>
           <select
             value={userType}
-            onChange={(e) => setUserType(e.target.value as UserType)}
+            onChange={(e) => setUserType(e.target.value as PublicUserType)}
             className="w-full p-2 border rounded"
           >
             <option value="client">Cliente</option>
             <option value="technician">Técnico</option>
-            <option value="admin">Administrador</option>
           </select>
         </div>
         

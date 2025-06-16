@@ -5,13 +5,28 @@ import { firestore } from '@/firebase/config';
 import { collection, query, where, getDocs, orderBy, doc, updateDoc, getDoc } from 'firebase/firestore';
 import Link from 'next/link';
 
+interface Service {
+  id: string;
+  status: string;
+  serviceType?: string;
+  serviceArea?: string;
+  technicianId?: string;
+  technicianName?: string;
+  technicianEmail?: string;
+  createdAt?: {
+    toDate: () => Date;
+  };
+  createdAtFormatted?: string;
+  [key: string]: any;
+}
+
 interface TechnicianDashboardProps {
   userId: string;
 }
 
 export default function TechnicianDashboard({ userId }: TechnicianDashboardProps) {
-  const [services, setServices] = useState<any[]>([]);
-  const [pendingRequests, setPendingRequests] = useState<any[]>([]);
+  const [services, setServices] = useState<Service[]>([]);
+  const [pendingRequests, setPendingRequests] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [stats, setStats] = useState({
@@ -51,7 +66,7 @@ export default function TechnicianDashboard({ userId }: TechnicianDashboardProps
         const servicesData = snapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data()
-        }));
+        })) as Service[];
 
         setServices(servicesData);
 
@@ -96,7 +111,7 @@ export default function TechnicianDashboard({ userId }: TechnicianDashboardProps
         id: doc.id,
         ...doc.data(),
         createdAtFormatted: doc.data().createdAt ? new Date(doc.data().createdAt.toDate()).toLocaleDateString() : 'Fecha desconocida'
-      }));
+      })) as Service[];
       
       // Filtrar solicitudes que coincidan con especialidades y áreas del técnico
       const filteredRequests = pendingServices.filter(service => {
@@ -185,7 +200,7 @@ export default function TechnicianDashboard({ userId }: TechnicianDashboardProps
       const servicesData = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
-      }));
+      })) as Service[];
       
       setServices(servicesData);
       

@@ -6,18 +6,27 @@ import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { firestore, auth } from '@/firebase/config';
 import Link from 'next/link';
 import ReviewForm from '@/components/reviews/ReviewForm';
-import { sanitizeServiceData } from '@/utils/dataSanitizer'; 
+import { sanitizeServiceData } from '@/utils/dataSanitizer';
+import { UserRole } from '@/types/auth';
 
 export default function ServiceDetail() {
   const params = useParams();
   const router = useRouter();
   const serviceId = params.id as string;
   
-  const [service, setService] = useState<any>(null);
+  const [service, setService] = useState<{
+    id: string;
+    status: string;
+    clientId: string;
+    technicianId: string;
+    createdAtFormatted: string;
+    updatedAtFormatted: string;
+    [key: string]: any;
+  } | null>(null);
   const [loading, setLoading] = useState(true);
   const [authChecked, setAuthChecked] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [userType, setUserType] = useState<string | null>(null);
+  const [userType, setUserType] = useState<UserRole | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [updating, setUpdating] = useState(false);
   const [hasReview, setHasReview] = useState(false);
@@ -34,7 +43,8 @@ export default function ServiceDetail() {
           // Obtener tipo de usuario
           const userDoc = await getDoc(doc(firestore, 'users', user.uid));
           if (userDoc.exists()) {
-            setUserType(userDoc.data().userType);
+            const userData = userDoc.data();
+            setUserType(userData.userType as UserRole);
           }
         } catch (error) {
           console.error('Error fetching user type:', error);
@@ -63,28 +73,33 @@ export default function ServiceDetail() {
         const serviceData = serviceDoc.data();
         
         // Determina si el usuario actual es propietario del servicio
-        const isOwner = userId && (
+        const isOwner = userId ? (
           userId === serviceData.clientId || 
           userId === serviceData.technicianId
-        );
+        ) : false;
         
         // Sanitizar los datos según el rol
         let processedData = serviceData;
         try {
-          processedData = sanitizeServiceData(serviceData, userType, isOwner);
+          if (userType) {
+            processedData = sanitizeServiceData(serviceData, userType, isOwner);
+          }
         } catch (err) {
           console.warn('Error al sanitizar datos:', err);
         }
         
         setService({
           id: serviceDoc.id,
+          status: serviceData.status || 'pending',
+          clientId: serviceData.clientId || '',
+          technicianId: serviceData.technicianId || '',
           ...processedData,
           createdAtFormatted: serviceData.createdAt 
             ? new Date(serviceData.createdAt.toDate()).toLocaleString() 
             : 'Fecha desconocida',
           updatedAtFormatted: serviceData.updatedAt 
             ? new Date(serviceData.updatedAt.toDate()).toLocaleString() 
-            : null
+            : 'No actualizado'
         });
         
         // Comprobar si el servicio ya tiene una reseña

@@ -23,6 +23,25 @@ interface StatsData {
   }>;
 }
 
+// Tipo para usuarios de Firestore
+type FirestoreUser = {
+  id: string;
+  userType: 'client' | 'technician' | 'admin';
+  displayName?: string;
+  email?: string;
+  // Puedes agregar más campos relevantes aquí
+};
+
+// Tipo para servicios de Firestore
+type FirestoreService = {
+  id: string;
+  status: 'pending' | 'accepted' | 'in_progress' | 'completed' | 'cancelled';
+  serviceType: string;
+  createdAt?: { toDate: () => Date };
+  technicianId?: string;
+  // Puedes agregar más campos relevantes aquí
+};
+
 export default function AdminStats() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -46,7 +65,7 @@ export default function AdminStats() {
 
         // 1. Obtener todos los usuarios
         const usersSnapshot = await getDocs(collection(firestore, 'users'));
-        const users = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const users: FirestoreUser[] = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FirestoreUser));
         
         // Calcular estadísticas de usuarios
         const totalUsers = users.length;
@@ -55,7 +74,7 @@ export default function AdminStats() {
 
         // 2. Obtener todos los servicios
         const servicesSnapshot = await getDocs(collection(firestore, 'services'));
-        const services = servicesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const services: FirestoreService[] = servicesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FirestoreService));
         
         // Calcular estadísticas de servicios
         const totalServices = services.length;
@@ -66,7 +85,7 @@ export default function AdminStats() {
         const servicesByMonth: Record<string, number> = {};
         services.forEach(service => {
           if (service.createdAt) {
-            const date = new Date(service.createdAt.toDate());
+            const date = service.createdAt.toDate();
             const monthYear = `${date.getMonth() + 1}/${date.getFullYear()}`;
             servicesByMonth[monthYear] = (servicesByMonth[monthYear] || 0) + 1;
           }

@@ -6,9 +6,23 @@ import { collection, getDocs, doc, updateDoc, deleteDoc } from 'firebase/firesto
 import AdminLayout from '@/components/admin/AdminLayout';
 import Link from 'next/link';
 
+// Tipo para servicios de Firestore
+type FirestoreService = {
+  id: string;
+  serviceType: string;
+  description?: string;
+  clientName?: string;
+  technicianName?: string;
+  clientEmail?: string;
+  technicianEmail?: string;
+  status: string;
+  createdAt?: { toDate: () => number };
+  // Puedes agregar más campos relevantes aquí
+};
+
 export default function AdminServices() {
-  const [services, setServices] = useState<any[]>([]);
-  const [filteredServices, setFilteredServices] = useState<any[]>([]);
+  const [services, setServices] = useState<FirestoreService[]>([]);
+  const [filteredServices, setFilteredServices] = useState<FirestoreService[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -22,14 +36,16 @@ export default function AdminServices() {
     const fetchServices = async () => {
       try {
         const servicesSnapshot = await getDocs(collection(firestore, 'services'));
-        const servicesData = servicesSnapshot.docs.map(doc => ({
+        const servicesData: FirestoreService[] = servicesSnapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data()
-        }));
+        } as FirestoreService));
         
         // Ordenar por fecha de creación (más recientes primero)
-        servicesData.sort((a: any, b: any) => {
-          return b.createdAt?.toDate() - a.createdAt?.toDate() || 0;
+        servicesData.sort((a, b) => {
+          const dateA = a.createdAt?.toDate() || 0;
+          const dateB = b.createdAt?.toDate() || 0;
+          return dateB - dateA;
         });
         
         setServices(servicesData);
@@ -284,9 +300,7 @@ export default function AdminServices() {
                                 <div className="flex items-start flex-col">
                                   <div className="text-sm font-medium text-gray-900">{service.serviceType || 'Servicio'}</div>
                                   <div className="text-sm text-gray-500 mt-1">
-                                    {service.description?.length > 50
-                                      ? `${service.description?.substring(0, 50)}...`
-                                      : service.description || 'Sin descripción'}
+                                    {service.description ? (service.description.length > 50 ? service.description.substring(0, 50) + '...' : service.description) : 'Sin descripción'}
                                   </div>
                                 </div>
                               </td>
